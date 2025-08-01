@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -43,14 +43,70 @@ export default function ChatApp() {
   const [isIncomingCall, setIsIncomingCall] = useState(false)
   const [incomingCallFrom, setIncomingCallFrom] = useState("")
 
-  const peerRef = useRef<any>(null)
-  const connectionRef = useRef<any>(null)
+  const peerRef = useRef<import('peerjs').Peer | null>(null)
+  const connectionRef = useRef<import('peerjs').DataConnection | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const localStreamRef = useRef<MediaStream | null>(null)
-  const callRef = useRef<any>(null)
+  const callRef = useRef<import('peerjs').MediaConnection | null>(null)
+
+  const handleIncomingData = useCallback((data: unknown) => {
+    const typedData = data as {
+      type: string;
+      senderName?: string;
+      content?: string;
+      fileName?: string;
+      fileSize?: number;
+      fileData?: ArrayBuffer;
+      userName?: string;
+    };
+
+    if (!typedData || typeof typedData !== 'object' || !typedData.type) {
+      return;
+    }
+
+    if (typedData.type === "message") {
+      const newMsg: Message = {
+        id: Date.now().toString(),
+        sender: typedData.senderName || "Unknown",
+        content: typedData.content || "",
+        timestamp: new Date(),
+        type: "text",
+      }
+      setMessages((prev) => [...prev, newMsg])
+    } else if (typedData.type === "file") {
+      const newMsg: Message = {
+        id: Date.now().toString(),
+        sender: typedData.senderName || "Unknown",
+        content: `Sent a file: ${typedData.fileName}`,
+        timestamp: new Date(),
+        type: "file",
+        fileName: typedData.fileName,
+        fileSize: typedData.fileSize,
+      }
+      setMessages((prev) => [...prev, newMsg])
+
+      if (typedData.fileData && typedData.fileName) {
+        const blob = new Blob([typedData.fileData])
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = typedData.fileName
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+
+        toast.success("File Received", {
+          description: `${typedData.fileName} has been downloaded automatically.`,
+        })
+      }
+    } else if (typedData.type === "user-info") {
+      setRemoteUserName(typedData.userName || "")
+    }
+  }, [])
 
   useEffect(() => {
     const initializePeer = async () => {
@@ -128,51 +184,11 @@ export default function ChatApp() {
         localStreamRef.current.getTracks().forEach((track) => track.stop())
       }
     }
-  }, [isNameSet, userName])
+      }, [isNameSet, userName, handleIncomingData])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
-
-  const handleIncomingData = (data: any) => {
-    if (data.type === "message") {
-      const newMsg: Message = {
-        id: Date.now().toString(),
-        sender: data.senderName,
-        content: data.content,
-        timestamp: new Date(),
-        type: "text",
-      }
-      setMessages((prev) => [...prev, newMsg])
-    } else if (data.type === "file") {
-      const newMsg: Message = {
-        id: Date.now().toString(),
-        sender: data.senderName,
-        content: `Sent a file: ${data.fileName}`,
-        timestamp: new Date(),
-        type: "file",
-        fileName: data.fileName,
-        fileSize: data.fileSize,
-      }
-      setMessages((prev) => [...prev, newMsg])
-
-      const blob = new Blob([data.fileData])
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = data.fileName
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-
-      toast.success("File Received", {
-        description: `${data.fileName} has been downloaded automatically.`,
-      })
-    } else if (data.type === "user-info") {
-      setRemoteUserName(data.userName)
-    }
-  }
 
   const connectToPeer = () => {
     if (!targetPeerId.trim()) {
@@ -184,7 +200,8 @@ export default function ChatApp() {
 
     setConnectionStatus("connecting")
 
-    const conn = peerRef.current.connect(targetPeerId)
+    const conn = peerRef.current?.connect(targetPeerId)
+    if (!conn) return
 
     conn.on("open", () => {
       connectionRef.current = conn
@@ -213,7 +230,7 @@ export default function ChatApp() {
       })
     })
 
-    conn.on("error", (err: any) => {
+    conn.on("error", (err: Error) => {
       console.error("Connection error:", err)
       setConnectionStatus("disconnected")
       toast.error("Connection Failed", {
@@ -252,7 +269,7 @@ export default function ChatApp() {
     reader.onload = (e) => {
       const fileData = e.target?.result
 
-      connectionRef.current.send({
+      connectionRef.current?.send({
         type: "file",
         fileName: file.name,
         fileSize: file.size,
@@ -296,29 +313,31 @@ export default function ChatApp() {
         localVideoRef.current.srcObject = stream
       }
 
-      const call = peerRef.current.call(connectionRef.current.peer, stream)
-      callRef.current = call
+      if (peerRef.current && connectionRef.current) {
+        const call = peerRef.current.call(connectionRef.current.peer, stream)
+        callRef.current = call
 
-      call.on("stream", (remoteStream: MediaStream) => {
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = remoteStream
+        call.on("stream", (remoteStream: MediaStream) => {
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = remoteStream
+          }
+        })
+
+        call.on("close", () => {
+          endCall()
+        })
+
+        setIsInCall(true)
+
+        const callMessage: Message = {
+          id: Date.now().toString(),
+          sender: userName,
+          content: "Started a video call",
+          timestamp: new Date(),
+          type: "call",
         }
-      })
-
-      call.on("close", () => {
-        endCall()
-      })
-
-      setIsInCall(true)
-
-      const callMessage: Message = {
-        id: Date.now().toString(),
-        sender: userName,
-        content: "Started a video call",
-        timestamp: new Date(),
-        type: "call",
+        setMessages((prev) => [...prev, callMessage])
       }
-      setMessages((prev) => [...prev, callMessage])
     } catch (error) {
       console.error("Error starting video call:", error)
         toast.error("Call Failed", {
@@ -339,17 +358,19 @@ export default function ChatApp() {
         localVideoRef.current.srcObject = stream
       }
 
-      callRef.current.answer(stream)
+      if (callRef.current) {
+        callRef.current.answer(stream)
 
-      callRef.current.on("stream", (remoteStream: MediaStream) => {
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = remoteStream
-        }
-      })
+        callRef.current.on("stream", (remoteStream: MediaStream) => {
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = remoteStream
+          }
+        })
 
-      callRef.current.on("close", () => {
-        endCall()
-      })
+        callRef.current.on("close", () => {
+          endCall()
+        })
+      }
 
       setIsInCall(true)
       setIsIncomingCall(false)
