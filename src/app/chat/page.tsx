@@ -41,6 +41,8 @@ export default function ChatApp() {
   const [newMessage, setNewMessage] = useState("")
   const [copiedPeerId, setCopiedPeerId] = useState(false)
   const [remoteUserName, setRemoteUserName] = useState("")
+  const [reconnectAttempts, setReconnectAttempts] = useState(0)
+  const [isReconnecting, setIsReconnecting] = useState(false)
 
   // Video call states
   const [isInCall, setIsInCall] = useState(false)
@@ -57,6 +59,60 @@ export default function ChatApp() {
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const localStreamRef = useRef<MediaStream | null>(null)
   const callRef = useRef<import('peerjs').MediaConnection | null>(null)
+
+  const handleNetworkError = useCallback(() => {
+    setIsReconnecting(true)
+    toast.error("Network Error", {
+      description: "Connection lost due to network issues. Attempting to reconnect...",
+    })
+    
+    // Attempt to reconnect after a delay
+    setTimeout(() => {
+      if (peerRef.current && !peerRef.current.destroyed) {
+        try {
+          peerRef.current.reconnect()
+        } catch (error) {
+          console.error("Reconnection failed:", error)
+        }
+      }
+      setIsReconnecting(false)
+    }, 3000)
+  }, [])
+
+  const handleServerError = useCallback(() => {
+    toast.error("Server Error", {
+      description: "PeerJS server is experiencing issues. Please try again in a moment.",
+    })
+  }, [])
+
+  const handleDisconnection = useCallback(() => {
+    if (reconnectAttempts < 3 && !isReconnecting) {
+      setIsReconnecting(true)
+      setReconnectAttempts(prev => prev + 1)
+      
+      toast.info("Reconnecting...", {
+        description: `Attempting to reconnect (${reconnectAttempts + 1}/3)...`,
+      })
+      
+      setTimeout(() => {
+        if (peerRef.current && !peerRef.current.destroyed) {
+          try {
+            peerRef.current.reconnect()
+            setIsReconnecting(false)
+          } catch (error) {
+            console.error("Reconnection failed:", error)
+            setIsReconnecting(false)
+            
+            if (reconnectAttempts >= 2) {
+              toast.error("Connection Failed", {
+                description: "Unable to reconnect. Please refresh the page.",
+              })
+            }
+          }
+        }
+      }, 2000 * reconnectAttempts) // Exponential backoff
+    }
+  }, [reconnectAttempts, isReconnecting])
 
   const endCall = useCallback(() => {
     if (callRef.current) {
@@ -160,6 +216,26 @@ export default function ChatApp() {
 
       const peer = new Peer({
         debug: 2,
+        config: {
+          'iceServers': [
+            // Google's public STUN servers
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            // Cloudflare's public STUN server
+            { urls: 'stun:stun.cloudflare.com:3478' },
+            // Add TURN servers for better reliability (you'll need to get your own)
+            // { 
+            //   urls: 'turn:your-turn-server.com:3478',
+            //   username: 'your-username',
+            //   credential: 'your-password'
+            // }
+          ]
+        },
+        // Use a more reliable PeerJS server or host your own
+        host: 'peerjs-server.herokuapp.com', // This is more stable than the default
+        port: 443,
+        path: '/',
+        secure: true,
       })
 
       peer.on("open", (id) => {
@@ -213,10 +289,26 @@ export default function ChatApp() {
 
       peer.on("error", (err) => {
         console.error("Peer error:", err)
-        toast.error("Connection Error", {
-          description: "Failed to establish connection. Please try again.",
-        })
+        
+        // Handle different types of errors
+        if (err.type === 'network') {
+          handleNetworkError()
+        } else if (err.type === 'server-error') {
+          handleServerError()
+        } else if (err.type === 'disconnected') {
+          handleDisconnection()
+        } else {
+          toast.error("Connection Error", {
+            description: `Connection failed: ${err.message || 'Unknown error'}. Please try again.`,
+          })
+        }
+        
         setConnectionStatus("disconnected")
+      })
+      
+      peer.on("disconnected", () => {
+        console.log("Peer disconnected, attempting to reconnect...")
+        handleDisconnection()
       })
 
       peerRef.current = peer
@@ -384,6 +476,15 @@ export default function ChatApp() {
         })
 
         call.on("close", () => {
+          console.log("Call closed by remote peer")
+          endCall()
+        })
+
+        call.on("error", (err) => {
+          console.error("Call error:", err)
+          toast.error("Call Error", {
+            description: "Video call encountered an error and was disconnected.",
+          })
           endCall()
         })
 
@@ -428,6 +529,15 @@ export default function ChatApp() {
         })
 
         callRef.current.on("close", () => {
+          console.log("Incoming call closed")
+          endCall()
+        })
+
+        callRef.current.on("error", (err) => {
+          console.error("Incoming call error:", err)
+          toast.error("Call Error", {
+            description: "Video call encountered an error and was disconnected.",
+          })
           endCall()
         })
       }
@@ -661,13 +771,17 @@ export default function ChatApp() {
           </div>
         ) : (
           <div className="space-y-6">
-            <Alert className="border-green-200 bg-green-50/80 backdrop-blur-sm">
-              <Wifi className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-800">
-                Connected with <span className="font-medium">{remoteUserName || "Unknown User"}</span>
-                <Badge variant="secondary" className="ml-2 bg-green-100 text-green-700 border-green-200">
+            <Alert className={`border-green-200 bg-green-50/80 backdrop-blur-sm ${isReconnecting ? 'border-yellow-200 bg-yellow-50/80' : ''}`}>
+              <Wifi className={`h-4 w-4 ${isReconnecting ? 'text-yellow-600' : 'text-green-600'}`} />
+              <AlertDescription className={isReconnecting ? 'text-yellow-800' : 'text-green-800'}>
+                {isReconnecting ? (
+                  <span>Reconnecting to <span className="font-medium">{remoteUserName || "Unknown User"}</span>...</span>
+                ) : (
+                  <span>Connected with <span className="font-medium">{remoteUserName || "Unknown User"}</span></span>
+                )}
+                <Badge variant="secondary" className={`ml-2 ${isReconnecting ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : 'bg-green-100 text-green-700 border-green-200'}`}>
                   <Wifi className="h-3 w-3 mr-1" />
-                  Online
+                  {isReconnecting ? 'Reconnecting...' : 'Online'}
                 </Badge>
               </AlertDescription>
             </Alert>
