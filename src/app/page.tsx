@@ -2,8 +2,9 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Users, MessageCircle, Upload, Video, ArrowRight } from "lucide-react"
+import { Users, MessageCircle, Upload, Video, ArrowRight, Shield, Zap, Globe } from "lucide-react"
 import Link from "next/link"
+import { SharePeerShare } from "@/components/social/TwitterShare"
 
 export default function LandingPage() {
   return (
@@ -33,12 +34,31 @@ export default function LandingPage() {
         <p className="text-xl text-gray-600 mb-12 max-w-2xl mx-auto">
           Connect with anyone using a simple code. No registration, no downloads, completely secure.
         </p>
-        <Link href="/chat">
-          <Button size="lg" className="text-lg px-8 py-3">
-            Try it now
-            <ArrowRight className="ml-2 h-5 w-5" />
-          </Button>
-        </Link>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
+          <Link href="/chat">
+            <Button size="lg" className="text-lg px-8 py-3">
+              Try it now
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+          </Link>
+          <SharePeerShare className="border-gray-300 hover:bg-gray-50" />
+        </div>
+
+        {/* Key Features Badge */}
+        <div className="flex flex-wrap justify-center gap-3 text-sm">
+          <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-800 rounded-full">
+            <Shield className="h-3 w-3" />
+            End-to-End Encrypted
+          </span>
+          <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full">
+            <Zap className="h-3 w-3" />
+            No File Size Limits
+          </span>
+          <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-800 rounded-full">
+            <Globe className="h-3 w-3" />
+            Works Everywhere
+          </span>
+        </div>
       </section>
 
       {/* Simple Features */}
@@ -70,8 +90,16 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t bg-gray-50">
-        <div className="max-w-4xl mx-auto px-6 py-8 text-center">
-          <p className="text-gray-600 text-sm">&copy; 2024 PeerShare. Secure peer-to-peer communication.</p>
+        <div className="max-w-4xl mx-auto px-6 py-8">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="text-center md:text-left">
+              <p className="text-gray-600 text-sm">&copy; 2024 PeerShare. Secure peer-to-peer communication.</p>
+              <p className="text-gray-500 text-xs mt-1">Built with ❤️ by <a href="https://avikmukherjee.me" className="hover:text-blue-600">Avik Mukherjee</a></p>
+            </div>
+            <div className="flex items-center gap-3">
+              <SharePeerShare className="border-gray-300 hover:bg-white text-sm" />
+            </div>
+          </div>
         </div>
       </footer>
     </div>

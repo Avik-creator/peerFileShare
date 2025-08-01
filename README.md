@@ -2,6 +2,8 @@
 
 A modern, secure peer-to-peer file sharing and video calling application built with Next.js and WebRTC technology. Share files instantly and make HD video calls without any servers storing your data.
 
+![PeerShareImage](https://peershare.avikmukherjee.me/og-image.png)
+
 ![PeerShare Demo](https://img.shields.io/badge/Status-Active-brightgreen) ![Next.js](https://img.shields.io/badge/Next.js-15.4.5-black) ![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)
 
 ## ✨ Features
@@ -30,6 +32,11 @@ A modern, secure peer-to-peer file sharing and video calling application built w
 - **Direct peer connections** - Data flows directly between devices
 - **Session-based** - Connection codes expire when you refresh
 
+### 📱 **Social Features**
+- **Twitter sharing** - Share your PeerShare experience on Twitter
+- **Success celebrations** - Share successful file transfers with friends
+- **Social promotion** - Help spread the word about secure P2P sharing
+
 ## 🚀 Technologies Used
 
 - **[Next.js 15.4.5](https://nextjs.org/)** - React framework for production
@@ -51,7 +58,7 @@ A modern, secure peer-to-peer file sharing and video calling application built w
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/Avik-creator/peerFileShare.git
+   git clone https://github.com/yourusername/peershare.git
    cd peershare
    ```
 
@@ -80,6 +87,8 @@ A modern, secure peer-to-peer file sharing and video calling application built w
 4. **Open your browser**
 
    Navigate to [http://localhost:3000](http://localhost:3000) to see PeerShare in action!
+
+   Or visit the live demo at [peershare.avikmukherjee.me](https://peershare.avikmukherjee.me)
 
 ## 📖 How to Use
 
@@ -113,6 +122,7 @@ A modern, secure peer-to-peer file sharing and video calling application built w
 - See real-time message history
 - Get notifications when files are shared
 - All messages are displayed with timestamps and sender names
+- Share your experience on Twitter with built-in social features
 
 ## 📁 Project Structure
 
@@ -168,7 +178,9 @@ The easiest way to deploy PeerShare is using [Vercel](https://vercel.com):
 2. Connect your repository to Vercel
 3. Deploy with one click!
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Avik-creator/peershare)
+**Live Example**: [peershare.avikmukherjee.me](https://peershare.avikmukherjee.me) (deployed on Vercel)
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/yourusername/peershare)
 
 ### Deploy on Netlify
 
@@ -240,9 +252,11 @@ We welcome contributions! Here's how you can help:
 
 If you have any questions or run into issues:
 
-- 🐛 [Report a bug](https://github.com/Avik-creator/peershare/issues)
-- 💡 [Request a feature](https://github.com/Avik-creator/peershare/issues)
-- 💬 [Join discussions](https://github.com/Avik-creator/peershare/discussions)
+- 🌐 [Try the live demo](https://peershare.avikmukherjee.me)
+- 🐛 [Report a bug](https://github.com/yourusername/peershare/issues)
+- 💡 [Request a feature](https://github.com/yourusername/peershare/issues)
+- 💬 [Join discussions](https://github.com/yourusername/peershare/discussions)
+- 🐦 [Follow on Twitter](https://twitter.com/avikmukherjee) for updates
 
 ---
 
@@ -250,4 +264,7 @@ If you have any questions or run into issues:
   <strong>Made with ❤️ for secure, private file sharing</strong>
   <br>
   <em>No servers. No tracking. Just pure peer-to-peer connection.</em>
+  <br><br>
+  <a href="https://peershare.avikmukherjee.me">🌐 Try PeerShare Now</a> |
+  <a href="https://twitter.com/intent/tweet?text=🚀%20Check%20out%20PeerShare%20-%20secure%20P2P%20file%20sharing%20%26%20video%20calls!%20No%20servers,%20no%20tracking,%20just%20pure%20peer-to-peer%20magic!%20🔒✨&url=https://peershare.avikmukherjee.me&hashtags=PeerShare,Privacy,P2P,SecureSharing">🐦 Share on Twitter</a>
 </div>

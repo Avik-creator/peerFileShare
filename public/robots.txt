@@ -1,0 +1,41 @@
+# Robots.txt for PeerShare - Secure P2P File Sharing & Video Calls
+# https://peershare.avikmukherjee.me
+
+User-agent: *
+Allow: /
+
+# Allow all major search engines
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Slurp
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+# Disallow crawling of API routes (if any)
+Disallow: /api/
+
+# Disallow crawling of build files and assets
+Disallow: /_next/
+Disallow: /static/
+
+# Allow manifest and service worker
+Allow: /manifest.json
+Allow: /sw.js
+
+# Crawl delay for polite crawling
+Crawl-delay: 1
+
+# Sitemap location
+Sitemap: https://peershare.avikmukherjee.me/sitemap.xml
+
+# Additional information
+# This is PeerShare - a secure peer-to-peer file sharing application
+# Built by Avik Mukherjee (https://avikmukherjee.me)
+# Features: P2P file sharing, video calls, real-time chat
+# Privacy-focused: No server storage, end-to-end encryption

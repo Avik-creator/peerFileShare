@@ -11,8 +11,9 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { toast } from "sonner"
-import { Users, Send, Upload, Copy, Check, Wifi, Video, VideoOff, Mic, MicOff, PhoneOff, ArrowLeft, Phone } from "lucide-react"
+import { Users, Send, Upload, Copy, Check, Wifi, Video, VideoOff, Mic, MicOff, PhoneOff, ArrowLeft, Phone, Share } from "lucide-react"
 import Link from "next/link"
+import { ShareSuccess } from "@/components/social/TwitterShare"
 
 interface Message {
   id: string
@@ -136,6 +137,12 @@ export default function ChatApp() {
 
         toast.success("File Received", {
           description: `${typedData.fileName} has been downloaded automatically.`,
+          action: {
+            label: "Share Experience",
+            onClick: () => {
+              // Twitter share will be handled by the ShareSuccess component
+            }
+          }
         })
       }
     } else if (typedData.type === "user-info") {
@@ -338,6 +345,12 @@ export default function ChatApp() {
 
       toast.success("File Sent", {
         description: `${file.name} has been sent successfully.`,
+        action: {
+          label: "Share Success",
+          onClick: () => {
+            // Twitter share will be handled by the ShareSuccess component
+          }
+        }
       })
     }
 
@@ -853,6 +866,13 @@ export default function ChatApp() {
                         End-to-end encrypted
                       </li>
                     </ul>
+                  </div>
+
+                  <Separator className="my-4" />
+
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-gray-800">Share PeerShare</h4>
+                    <ShareSuccess className="w-full justify-center" />
                   </div>
                 </CardContent>
               </Card>
