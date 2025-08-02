@@ -20,7 +20,7 @@ export function TwitterShare({
   text = "🚀 Just discovered PeerShare - secure P2P file sharing & HD video calls with no servers! Share files instantly with end-to-end encryption. No registration required! 🔒✨",
   url = "https://peershare.avikmukherjee.me",
   hashtags = ["PeerShare", "P2P", "FileSharing", "Privacy", "WebRTC", "SecureSharing"],
-  via = "avikmukherjee",
+  via = "avikm744",
   className = "",
   variant = "default",
   size = "default",

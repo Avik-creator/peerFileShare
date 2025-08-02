@@ -93,7 +93,7 @@ export default function LandingPage() {
         <div className="max-w-4xl mx-auto px-6 py-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-center md:text-left">
-              <p className="text-gray-600 text-sm">&copy; 2024 PeerShare. Secure peer-to-peer communication.</p>
+              <p className="text-gray-600 text-sm">&copy; {new Date().getFullYear()} PeerShare. Secure peer-to-peer communication.</p>
               <p className="text-gray-500 text-xs mt-1">Built with ❤️ by <a href="https://avikmukherjee.me" className="hover:text-blue-600">Avik Mukherjee</a></p>
             </div>
             <div className="flex items-center gap-3">
