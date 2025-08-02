@@ -1,8 +1,7 @@
 "use client"
-
 import type React from "react"
 import { useState, useEffect, useRef, useCallback } from "react"
-import { Video, VideoOff, Mic, MicOff, PhoneOff } from "lucide-react"
+import { Video, VideoOff, Mic, MicOff, PhoneOff, Monitor, MonitorOff } from "lucide-react"
 import { toast } from "sonner"
 
 interface Message {
@@ -36,6 +35,10 @@ export default function ChatApp() {
   const [hasLocalStream, setHasLocalStream] = useState(false)
   const [hasRemoteStream, setHasRemoteStream] = useState(false)
 
+  // Screen sharing states
+  const [isScreenSharing, setIsScreenSharing] = useState(false)
+  const [remoteIsScreenSharing, setRemoteIsScreenSharing] = useState(false)
+
   const peerRef = useRef<import("peerjs").Peer | null>(null)
   const connectionRef = useRef<import("peerjs").DataConnection | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -43,16 +46,15 @@ export default function ChatApp() {
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const localStreamRef = useRef<MediaStream | null>(null)
+  const screenStreamRef = useRef<MediaStream | null>(null)
   const callRef = useRef<import("peerjs").MediaConnection | null>(null)
 
   // Helper function to safely set video stream
   const setVideoStream = useCallback((videoElement: HTMLVideoElement | null, stream: MediaStream | null) => {
     if (!videoElement) return false
-
     try {
       videoElement.srcObject = stream
       if (stream) {
-        // Ensure the video plays
         const playPromise = videoElement.play()
         if (playPromise !== undefined) {
           playPromise.catch((error) => {
@@ -73,12 +75,20 @@ export default function ChatApp() {
       console.log("Remote stream received:", remoteStream)
       console.log("Remote stream tracks:", remoteStream.getTracks())
 
-      // Check if stream has video tracks
       const videoTracks = remoteStream.getVideoTracks()
       const audioTracks = remoteStream.getAudioTracks()
-
       console.log("Video tracks:", videoTracks.length)
       console.log("Audio tracks:", audioTracks.length)
+
+      // Check if this is a screen share stream
+      const isScreenShare = videoTracks.some(
+        (track) =>
+          track.label.includes("screen") ||
+          track.label.includes("Screen") ||
+          track.getSettings().displaySurface === "monitor",
+      )
+
+      setRemoteIsScreenSharing(isScreenShare)
 
       if (videoTracks.length === 0) {
         console.warn("No video tracks in remote stream")
@@ -88,13 +98,18 @@ export default function ChatApp() {
         })
       }
 
-      // Use setTimeout to ensure the video element is ready
       setTimeout(() => {
         if (remoteVideoRef.current) {
           const success = setVideoStream(remoteVideoRef.current, remoteStream)
           if (success) {
             setHasRemoteStream(true)
             console.log("Remote stream successfully set")
+            if (isScreenShare) {
+              toast.info("Screen Share", {
+                description: "Remote user is sharing their screen.",
+                className: "bg-blue-500 text-white",
+              })
+            }
           } else {
             console.error("Failed to set remote stream")
           }
@@ -110,19 +125,22 @@ export default function ChatApp() {
     if (callRef.current) {
       callRef.current.close()
     }
-
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => track.stop())
       localStreamRef.current = null
     }
-
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach((track) => track.stop())
+      screenStreamRef.current = null
+    }
     setVideoStream(localVideoRef.current, null)
     setVideoStream(remoteVideoRef.current, null)
-
     setIsInCall(false)
     setIsIncomingCall(false)
     setHasLocalStream(false)
     setHasRemoteStream(false)
+    setIsScreenSharing(false)
+    setRemoteIsScreenSharing(false)
 
     const callMessage: Message = {
       id: Date.now().toString(),
@@ -143,6 +161,7 @@ export default function ChatApp() {
       fileSize?: number
       fileData?: ArrayBuffer
       userName?: string
+      isScreenSharing?: boolean
     }
 
     if (!typedData || typeof typedData !== "object" || !typedData.type) {
@@ -189,6 +208,8 @@ export default function ChatApp() {
       setRemoteUserName(typedData.userName || "")
     } else if (typedData.type === "incoming-call") {
       setIncomingCallFrom(typedData.userName || "Unknown User")
+    } else if (typedData.type === "screen-share-status") {
+      setRemoteIsScreenSharing(typedData.isScreenSharing || false)
     }
   }, [])
 
@@ -234,13 +255,10 @@ export default function ChatApp() {
         })
       })
 
-      // Handle incoming calls
       peer.on("call", (call) => {
         setIsIncomingCall(true)
         setIncomingCallFrom(call.peer)
         callRef.current = call
-
-        // Set up call event handlers
         call.on("stream", handleRemoteStream)
         call.on("close", () => {
           endCall()
@@ -269,6 +287,9 @@ export default function ChatApp() {
       }
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((track) => track.stop())
+      }
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach((track) => track.stop())
       }
     }
   }, [isNameSet, userName, handleIncomingData, endCall, handleRemoteStream])
@@ -378,9 +399,153 @@ export default function ChatApp() {
       })
     }
     reader.readAsArrayBuffer(file)
-
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
+    }
+  }
+
+  const replaceVideoTrack = async (newStream: MediaStream) => {
+    if (!callRef.current) return
+
+    const videoTrack = newStream.getVideoTracks()[0]
+    if (!videoTrack) return
+
+    try {
+      const sender = callRef.current.peerConnection?.getSenders().find((s) => s.track && s.track.kind === "video")
+
+      if (sender) {
+        await sender.replaceTrack(videoTrack)
+        console.log("Video track replaced successfully")
+      }
+    } catch (error) {
+      console.error("Error replacing video track:", error)
+    }
+  }
+
+  const startScreenShare = async () => {
+    try {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true,
+      })
+
+      screenStreamRef.current = screenStream
+
+      // Combine screen video with existing audio from camera
+      const audioTrack = localStreamRef.current?.getAudioTracks()[0]
+      const combinedStream = new MediaStream()
+
+      // Add screen video track
+      screenStream.getVideoTracks().forEach((track) => {
+        combinedStream.addTrack(track)
+        // Handle when user stops sharing from browser controls
+        track.onended = () => {
+          stopScreenShare()
+        }
+      })
+
+      // Add audio track from camera if available
+      if (audioTrack) {
+        combinedStream.addTrack(audioTrack)
+      }
+
+      // Update local video display
+      setTimeout(() => {
+        if (localVideoRef.current) {
+          setVideoStream(localVideoRef.current, combinedStream)
+        }
+      }, 100)
+
+      // Replace video track in the call
+      await replaceVideoTrack(combinedStream)
+
+      setIsScreenSharing(true)
+
+      // Notify remote user about screen sharing
+      if (connectionRef.current) {
+        connectionRef.current.send({
+          type: "screen-share-status",
+          isScreenSharing: true,
+        })
+      }
+
+      toast.success("Screen Sharing", {
+        description: "You are now sharing your screen.",
+        className: "bg-blue-500 text-white",
+      })
+
+      const shareMessage: Message = {
+        id: Date.now().toString(),
+        sender: userName,
+        content: "Started screen sharing",
+        timestamp: new Date(),
+        type: "call",
+      }
+      setMessages((prev) => [...prev, shareMessage])
+    } catch (error) {
+      console.error("Error starting screen share:", error)
+      toast.error("Screen Share Failed", {
+        description: "Could not start screen sharing. Please try again.",
+        className: "bg-red-500 text-white",
+      })
+    }
+  }
+
+  const stopScreenShare = async () => {
+    try {
+      // Stop screen sharing stream
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach((track) => track.stop())
+        screenStreamRef.current = null
+      }
+
+      // Get camera stream back
+      const cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: isVideoEnabled,
+        audio: isAudioEnabled,
+      })
+
+      localStreamRef.current = cameraStream
+
+      // Update local video display
+      setTimeout(() => {
+        if (localVideoRef.current) {
+          setVideoStream(localVideoRef.current, cameraStream)
+        }
+      }, 100)
+
+      // Replace video track back to camera
+      await replaceVideoTrack(cameraStream)
+
+      setIsScreenSharing(false)
+
+      // Notify remote user
+      if (connectionRef.current) {
+        connectionRef.current.send({
+          type: "screen-share-status",
+          isScreenSharing: false,
+        })
+      }
+
+      toast.info("Camera", {
+        description: "Switched back to camera.",
+        className: "bg-gray-500 text-white",
+      })
+
+      const shareMessage: Message = {
+        id: Date.now().toString(),
+        sender: userName,
+        content: "Stopped screen sharing",
+        timestamp: new Date(),
+        type: "call",
+      }
+      setMessages((prev) => [...prev, shareMessage])
+    } catch (error) {
+      console.error("Error stopping screen share:", error)
+      toast.error("Error", {
+        description: "Could not switch back to camera.",
+        className: "bg-red-500 text-white",
+      })
     }
   }
 
@@ -393,9 +558,7 @@ export default function ChatApp() {
 
       localStreamRef.current = stream
       console.log("Local stream obtained:", stream)
-      console.log("Local stream tracks:", stream.getTracks())
 
-      // Set local video with delay to ensure element is ready
       setTimeout(() => {
         if (localVideoRef.current) {
           const success = setVideoStream(localVideoRef.current, stream)
@@ -409,20 +572,17 @@ export default function ChatApp() {
       if (peerRef.current && connectionRef.current) {
         const call = peerRef.current.call(connectionRef.current.peer, stream)
         callRef.current = call
-
         call.on("stream", handleRemoteStream)
         call.on("close", () => {
           endCall()
         })
 
-        // Send user info to the callee
         connectionRef.current.send({
           type: "incoming-call",
           userName: userName,
         })
 
         setIsInCall(true)
-
         const callMessage: Message = {
           id: Date.now().toString(),
           sender: userName,
@@ -451,7 +611,6 @@ export default function ChatApp() {
       localStreamRef.current = stream
       console.log("Local stream obtained for answer:", stream)
 
-      // Set local video with delay
       setTimeout(() => {
         if (localVideoRef.current) {
           const success = setVideoStream(localVideoRef.current, stream)
@@ -472,7 +631,6 @@ export default function ChatApp() {
 
       setIsInCall(true)
       setIsIncomingCall(false)
-
       const callMessage: Message = {
         id: Date.now().toString(),
         sender: userName,
@@ -545,7 +703,7 @@ export default function ChatApp() {
             <h1 className="text-2xl font-light text-gray-900">PeerShare</h1>
             <p className="text-gray-600 text-sm">Enter your name to start sharing files and chatting</p>
           </div>
-          
+
           <div className="space-y-4">
             <input
               placeholder="Enter your name"
@@ -554,8 +712,8 @@ export default function ChatApp() {
               onKeyPress={(e) => e.key === "Enter" && userName.trim() && setIsNameSet(true)}
               className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 text-gray-900 placeholder-gray-500"
             />
-            <button 
-              onClick={() => setIsNameSet(true)} 
+            <button
+              onClick={() => setIsNameSet(true)}
               disabled={!userName.trim()}
               className="w-full px-4 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
@@ -583,14 +741,14 @@ export default function ChatApp() {
                 <h2 className="text-xl font-light text-gray-900">Incoming Video Call</h2>
                 <p className="text-gray-600 text-sm">{remoteUserName} is calling you</p>
                 <div className="flex gap-3 justify-center">
-                  <button 
-                    onClick={answerCall} 
+                  <button
+                    onClick={answerCall}
                     className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
                   >
                     Answer
                   </button>
-                  <button 
-                    onClick={rejectCall} 
+                  <button
+                    onClick={rejectCall}
                     className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     Decline
@@ -608,12 +766,12 @@ export default function ChatApp() {
               <p className="text-gray-600 text-sm">Share this code with others to receive connection requests</p>
               {myPeerId ? (
                 <div className="flex items-center gap-3">
-                  <input 
-                    value={myPeerId} 
-                    readOnly 
+                  <input
+                    value={myPeerId}
+                    readOnly
                     className="flex-1 px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-900 font-mono text-sm"
                   />
-                  <button 
+                  <button
                     onClick={copyPeerId}
                     className="px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                   >
@@ -661,7 +819,17 @@ export default function ChatApp() {
             {/* Video Call Section */}
             {isInCall && (
               <div className="space-y-4">
-                <h2 className="text-lg font-light text-gray-900">Video Call</h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-light text-gray-900">Video Call</h2>
+                  <div className="flex gap-2 text-xs text-gray-500">
+                    {isScreenSharing && (
+                      <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded">You&aposre sharing</span>
+                    )}
+                    {remoteIsScreenSharing && (
+                      <span className="px-2 py-1 bg-green-100 text-green-800 rounded">Remote sharing</span>
+                    )}
+                  </div>
+                </div>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="relative">
                     <video
@@ -679,6 +847,7 @@ export default function ChatApp() {
                     )}
                     <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
                       {remoteUserName || "Remote User"}
+                      {remoteIsScreenSharing && " (Screen)"}
                     </div>
                   </div>
                   <div className="relative">
@@ -697,32 +866,33 @@ export default function ChatApp() {
                       </div>
                     )}
                     <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
-                      You
+                      You {isScreenSharing && "(Screen)"}
                     </div>
                   </div>
                 </div>
                 <div className="flex justify-center gap-3">
-                  <button 
+                  <button
                     onClick={toggleAudio}
-                    className={`p-3 rounded-lg border transition-colors ${
-                      isAudioEnabled 
-                        ? "border-gray-300 hover:bg-gray-50" 
-                        : "border-red-300 bg-red-50 text-red-700"
-                    }`}
+                    className={`p-3 rounded-lg border transition-colors ${isAudioEnabled ? "border-gray-300 hover:bg-gray-50" : "border-red-300 bg-red-50 text-red-700"
+                      }`}
                   >
                     {isAudioEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
                   </button>
-                  <button 
+                  <button
                     onClick={toggleVideo}
-                    className={`p-3 rounded-lg border transition-colors ${
-                      isVideoEnabled 
-                        ? "border-gray-300 hover:bg-gray-50" 
-                        : "border-red-300 bg-red-50 text-red-700"
-                    }`}
+                    className={`p-3 rounded-lg border transition-colors ${isVideoEnabled ? "border-gray-300 hover:bg-gray-50" : "border-red-300 bg-red-50 text-red-700"
+                      }`}
                   >
                     {isVideoEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
                   </button>
-                  <button 
+                  <button
+                    onClick={isScreenSharing ? stopScreenShare : startScreenShare}
+                    className={`p-3 rounded-lg border transition-colors ${isScreenSharing ? "border-blue-300 bg-blue-50 text-blue-700" : "border-gray-300 hover:bg-gray-50"
+                      }`}
+                  >
+                    {isScreenSharing ? <MonitorOff className="h-4 w-4" /> : <Monitor className="h-4 w-4" />}
+                  </button>
+                  <button
                     onClick={endCall}
                     className="p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                   >
@@ -744,11 +914,8 @@ export default function ChatApp() {
                           className={`flex ${message.sender === userName ? "justify-end" : "justify-start"}`}
                         >
                           <div
-                            className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                              message.sender === userName 
-                                ? "bg-gray-900 text-white" 
-                                : "bg-gray-100 text-gray-900"
-                            }`}
+                            className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${message.sender === userName ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-900"
+                              }`}
                           >
                             <div className="text-xs opacity-75 mb-1">
                               {message.sender} • {formatTime(message.timestamp)}
@@ -773,7 +940,7 @@ export default function ChatApp() {
                           onKeyPress={(e) => e.key === "Enter" && sendMessage()}
                           className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 text-gray-900 placeholder-gray-500"
                         />
-                        <button 
+                        <button
                           onClick={sendMessage}
                           className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
                         >
@@ -789,14 +956,13 @@ export default function ChatApp() {
                 <h2 className="text-lg font-light text-gray-900">Actions</h2>
                 <div className="space-y-3">
                   <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
-                  
-                  <button 
-                    onClick={() => fileInputRef.current?.click()} 
+
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
                     className="w-full px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-700"
                   >
                     Share File
                   </button>
-
                   <button
                     onClick={startVideoCall}
                     disabled={isInCall}
@@ -811,6 +977,7 @@ export default function ChatApp() {
                   <ul className="space-y-1 text-xs text-gray-500">
                     <li>• Instant file sharing</li>
                     <li>• HD video calling</li>
+                    <li>• Screen sharing</li>
                     <li>• Real-time chat</li>
                     <li>• End-to-end encrypted</li>
                   </ul>
