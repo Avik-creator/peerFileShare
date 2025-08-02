@@ -42,6 +42,8 @@ export default function ChatApp() {
   const [isAudioEnabled, setIsAudioEnabled] = useState(true)
   const [isIncomingCall, setIsIncomingCall] = useState(false)
   const [incomingCallFrom, setIncomingCallFrom] = useState("")
+  const [hasLocalStream, setHasLocalStream] = useState(false)
+  const [hasRemoteStream, setHasRemoteStream] = useState(false)
 
   const peerRef = useRef<import('peerjs').Peer | null>(null)
   const connectionRef = useRef<import('peerjs').DataConnection | null>(null)
@@ -51,6 +53,39 @@ export default function ChatApp() {
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const localStreamRef = useRef<MediaStream | null>(null)
   const callRef = useRef<import('peerjs').MediaConnection | null>(null)
+
+  const endCall = useCallback(() => {
+    if (callRef.current) {
+      callRef.current.close()
+    }
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => track.stop())
+      localStreamRef.current = null
+    }
+
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = null
+    }
+
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null
+    }
+
+    setIsInCall(false)
+    setIsIncomingCall(false)
+    setHasLocalStream(false)
+    setHasRemoteStream(false)
+
+    const callMessage: Message = {
+      id: Date.now().toString(),
+      sender: userName,
+      content: "Ended the video call",
+      timestamp: new Date(),
+      type: "call",
+    }
+    setMessages((prev) => [...prev, callMessage])
+  }, [userName])
 
   const handleIncomingData = useCallback((data: unknown) => {
     const typedData = data as {
@@ -105,6 +140,8 @@ export default function ChatApp() {
       }
     } else if (typedData.type === "user-info") {
       setRemoteUserName(typedData.userName || "")
+    } else if (typedData.type === "incoming-call") {
+      setIncomingCallFrom(typedData.userName || "Unknown User")
     }
   }, [])
 
@@ -159,6 +196,19 @@ export default function ChatApp() {
 
         // Store the call reference
         callRef.current = call
+
+        // Set up call event handlers
+        call.on("stream", (remoteStream: MediaStream) => {
+          console.log("Remote stream received in incoming call")
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = remoteStream
+            setHasRemoteStream(true)
+          }
+        })
+
+        call.on("close", () => {
+          endCall()
+        })
       })
 
       peer.on("error", (err) => {
@@ -184,7 +234,7 @@ export default function ChatApp() {
         localStreamRef.current.getTracks().forEach((track) => track.stop())
       }
     }
-      }, [isNameSet, userName, handleIncomingData])
+      }, [isNameSet, userName, handleIncomingData, endCall])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -311,6 +361,8 @@ export default function ChatApp() {
       localStreamRef.current = stream
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream
+        setHasLocalStream(true)
+        console.log("Local stream set in startVideoCall")
       }
 
       if (peerRef.current && connectionRef.current) {
@@ -318,13 +370,21 @@ export default function ChatApp() {
         callRef.current = call
 
         call.on("stream", (remoteStream: MediaStream) => {
+          console.log("Remote stream received in startVideoCall")
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = remoteStream
+            setHasRemoteStream(true)
           }
         })
 
         call.on("close", () => {
           endCall()
+        })
+
+        // Send user info to the callee
+        connectionRef.current.send({
+          type: "incoming-call",
+          userName: userName,
         })
 
         setIsInCall(true)
@@ -356,14 +416,18 @@ export default function ChatApp() {
       localStreamRef.current = stream
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream
+        setHasLocalStream(true)
+        console.log("Local stream set in answerCall")
       }
 
       if (callRef.current) {
         callRef.current.answer(stream)
 
         callRef.current.on("stream", (remoteStream: MediaStream) => {
+          console.log("Remote stream received in answerCall")
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = remoteStream
+            setHasRemoteStream(true)
           }
         })
 
@@ -396,37 +460,6 @@ export default function ChatApp() {
     if (callRef.current) {
       callRef.current.close()
     }
-  }
-
-  const endCall = () => {
-    if (callRef.current) {
-      callRef.current.close()
-    }
-
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => track.stop())
-      localStreamRef.current = null
-    }
-
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = null
-    }
-
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = null
-    }
-
-    setIsInCall(false)
-    setIsIncomingCall(false)
-
-    const callMessage: Message = {
-      id: Date.now().toString(),
-      sender: userName,
-      content: "Ended the video call",
-      timestamp: new Date(),
-      type: "call",
-    }
-    setMessages((prev) => [...prev, callMessage])
   }
 
   const toggleVideo = () => {
@@ -624,6 +657,14 @@ export default function ChatApp() {
                         playsInline
                         className="w-full h-64 bg-gray-900 rounded-lg object-cover"
                       />
+                      {!hasRemoteStream && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 rounded-lg">
+                          <div className="text-white text-center">
+                            <Video className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">Waiting for remote video...</p>
+                          </div>
+                        </div>
+                      )}
                       <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
                         {remoteUserName || "Remote User"}
                       </div>
@@ -636,6 +677,14 @@ export default function ChatApp() {
                         muted
                         className="w-full h-64 bg-gray-900 rounded-lg object-cover"
                       />
+                      {!hasLocalStream && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 rounded-lg">
+                          <div className="text-white text-center">
+                            <Video className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">Your camera</p>
+                          </div>
+                        </div>
+                      )}
                       <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
                         You
                       </div>
