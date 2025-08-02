@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -45,14 +44,74 @@ export default function ChatApp() {
   const [hasLocalStream, setHasLocalStream] = useState(false)
   const [hasRemoteStream, setHasRemoteStream] = useState(false)
 
-  const peerRef = useRef<import('peerjs').Peer | null>(null)
-  const connectionRef = useRef<import('peerjs').DataConnection | null>(null)
+  const peerRef = useRef<import("peerjs").Peer | null>(null)
+  const connectionRef = useRef<import("peerjs").DataConnection | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const localStreamRef = useRef<MediaStream | null>(null)
-  const callRef = useRef<import('peerjs').MediaConnection | null>(null)
+  const callRef = useRef<import("peerjs").MediaConnection | null>(null)
+
+  // Helper function to safely set video stream
+  const setVideoStream = useCallback((videoElement: HTMLVideoElement | null, stream: MediaStream | null) => {
+    if (!videoElement) return false
+
+    try {
+      videoElement.srcObject = stream
+      if (stream) {
+        // Ensure the video plays
+        const playPromise = videoElement.play()
+        if (playPromise !== undefined) {
+          playPromise.catch((error) => {
+            console.error("Error playing video:", error)
+          })
+        }
+      }
+      return true
+    } catch (error) {
+      console.error("Error setting video stream:", error)
+      return false
+    }
+  }, [])
+
+  // Enhanced remote stream handler
+  const handleRemoteStream = useCallback(
+    (remoteStream: MediaStream) => {
+      console.log("Remote stream received:", remoteStream)
+      console.log("Remote stream tracks:", remoteStream.getTracks())
+
+      // Check if stream has video tracks
+      const videoTracks = remoteStream.getVideoTracks()
+      const audioTracks = remoteStream.getAudioTracks()
+
+      console.log("Video tracks:", videoTracks.length)
+      console.log("Audio tracks:", audioTracks.length)
+
+      if (videoTracks.length === 0) {
+        console.warn("No video tracks in remote stream")
+        toast.warning("No Video", {
+          description: "The remote user has no video enabled.",
+        })
+      }
+
+      // Use setTimeout to ensure the video element is ready
+      setTimeout(() => {
+        if (remoteVideoRef.current) {
+          const success = setVideoStream(remoteVideoRef.current, remoteStream)
+          if (success) {
+            setHasRemoteStream(true)
+            console.log("Remote stream successfully set")
+          } else {
+            console.error("Failed to set remote stream")
+          }
+        } else {
+          console.error("Remote video ref is null")
+        }
+      }, 100)
+    },
+    [setVideoStream],
+  )
 
   const endCall = useCallback(() => {
     if (callRef.current) {
@@ -64,13 +123,8 @@ export default function ChatApp() {
       localStreamRef.current = null
     }
 
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = null
-    }
-
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = null
-    }
+    setVideoStream(localVideoRef.current, null)
+    setVideoStream(remoteVideoRef.current, null)
 
     setIsInCall(false)
     setIsIncomingCall(false)
@@ -85,21 +139,21 @@ export default function ChatApp() {
       type: "call",
     }
     setMessages((prev) => [...prev, callMessage])
-  }, [userName])
+  }, [userName, setVideoStream])
 
   const handleIncomingData = useCallback((data: unknown) => {
     const typedData = data as {
-      type: string;
-      senderName?: string;
-      content?: string;
-      fileName?: string;
-      fileSize?: number;
-      fileData?: ArrayBuffer;
-      userName?: string;
-    };
+      type: string
+      senderName?: string
+      content?: string
+      fileName?: string
+      fileSize?: number
+      fileData?: ArrayBuffer
+      userName?: string
+    }
 
-    if (!typedData || typeof typedData !== 'object' || !typedData.type) {
-      return;
+    if (!typedData || typeof typedData !== "object" || !typedData.type) {
+      return
     }
 
     if (typedData.type === "message") {
@@ -133,7 +187,6 @@ export default function ChatApp() {
         a.click()
         document.body.removeChild(a)
         URL.revokeObjectURL(url)
-
         toast.success("File Received", {
           description: `${typedData.fileName} has been downloaded automatically.`,
         })
@@ -148,7 +201,6 @@ export default function ChatApp() {
   useEffect(() => {
     const initializePeer = async () => {
       const { default: Peer } = await import("peerjs")
-
       const peer = new Peer({
         debug: 2,
       })
@@ -160,17 +212,14 @@ export default function ChatApp() {
 
       peer.on("connection", (conn) => {
         console.log("Incoming connection from:", conn.peer)
-
         conn.on("open", () => {
           connectionRef.current = conn
           setIsConnected(true)
           setConnectionStatus("connected")
-
           conn.send({
             type: "user-info",
             userName: userName,
           })
-
           toast.success("Connected!", {
             description: "You are now connected and can start sharing files and chatting.",
           })
@@ -193,19 +242,10 @@ export default function ChatApp() {
       peer.on("call", (call) => {
         setIsIncomingCall(true)
         setIncomingCallFrom(call.peer)
-
-        // Store the call reference
         callRef.current = call
 
         // Set up call event handlers
-        call.on("stream", (remoteStream: MediaStream) => {
-          console.log("Remote stream received in incoming call")
-          if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = remoteStream
-            setHasRemoteStream(true)
-          }
-        })
-
+        call.on("stream", handleRemoteStream)
         call.on("close", () => {
           endCall()
         })
@@ -234,7 +274,7 @@ export default function ChatApp() {
         localStreamRef.current.getTracks().forEach((track) => track.stop())
       }
     }
-      }, [isNameSet, userName, handleIncomingData, endCall])
+  }, [isNameSet, userName, handleIncomingData, endCall, handleRemoteStream])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -249,7 +289,6 @@ export default function ChatApp() {
     }
 
     setConnectionStatus("connecting")
-
     const conn = peerRef.current?.connect(targetPeerId)
     if (!conn) return
 
@@ -257,12 +296,10 @@ export default function ChatApp() {
       connectionRef.current = conn
       setIsConnected(true)
       setConnectionStatus("connected")
-
       conn.send({
         type: "user-info",
         userName: userName,
       })
-
       toast.success("Connected!", {
         description: "You are now connected and can start sharing files and chatting.",
       })
@@ -301,13 +338,11 @@ export default function ChatApp() {
     }
 
     setMessages((prev) => [...prev, message])
-
     connectionRef.current.send({
       type: "message",
       content: newMessage,
       senderName: userName,
     })
-
     setNewMessage("")
   }
 
@@ -318,7 +353,6 @@ export default function ChatApp() {
     const reader = new FileReader()
     reader.onload = (e) => {
       const fileData = e.target?.result
-
       connectionRef.current?.send({
         type: "file",
         fileName: file.name,
@@ -336,14 +370,11 @@ export default function ChatApp() {
         fileName: file.name,
         fileSize: file.size,
       }
-
       setMessages((prev) => [...prev, message])
-
       toast.success("File Sent", {
         description: `${file.name} has been sent successfully.`,
       })
     }
-
     reader.readAsArrayBuffer(file)
 
     if (fileInputRef.current) {
@@ -359,24 +390,25 @@ export default function ChatApp() {
       })
 
       localStreamRef.current = stream
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream
-        setHasLocalStream(true)
-        console.log("Local stream set in startVideoCall")
-      }
+      console.log("Local stream obtained:", stream)
+      console.log("Local stream tracks:", stream.getTracks())
+
+      // Set local video with delay to ensure element is ready
+      setTimeout(() => {
+        if (localVideoRef.current) {
+          const success = setVideoStream(localVideoRef.current, stream)
+          if (success) {
+            setHasLocalStream(true)
+            console.log("Local stream successfully set")
+          }
+        }
+      }, 100)
 
       if (peerRef.current && connectionRef.current) {
         const call = peerRef.current.call(connectionRef.current.peer, stream)
         callRef.current = call
 
-        call.on("stream", (remoteStream: MediaStream) => {
-          console.log("Remote stream received in startVideoCall")
-          if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = remoteStream
-            setHasRemoteStream(true)
-          }
-        })
-
+        call.on("stream", handleRemoteStream)
         call.on("close", () => {
           endCall()
         })
@@ -400,7 +432,7 @@ export default function ChatApp() {
       }
     } catch (error) {
       console.error("Error starting video call:", error)
-        toast.error("Call Failed", {
+      toast.error("Call Failed", {
         description: "Could not access camera/microphone. Please check permissions.",
       })
     }
@@ -414,23 +446,22 @@ export default function ChatApp() {
       })
 
       localStreamRef.current = stream
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream
-        setHasLocalStream(true)
-        console.log("Local stream set in answerCall")
-      }
+      console.log("Local stream obtained for answer:", stream)
+
+      // Set local video with delay
+      setTimeout(() => {
+        if (localVideoRef.current) {
+          const success = setVideoStream(localVideoRef.current, stream)
+          if (success) {
+            setHasLocalStream(true)
+            console.log("Local stream successfully set in answer")
+          }
+        }
+      }, 100)
 
       if (callRef.current) {
         callRef.current.answer(stream)
-
-        callRef.current.on("stream", (remoteStream: MediaStream) => {
-          console.log("Remote stream received in answerCall")
-          if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = remoteStream
-            setHasRemoteStream(true)
-          }
-        })
-
+        callRef.current.on("stream", handleRemoteStream)
         callRef.current.on("close", () => {
           endCall()
         })
@@ -486,7 +517,7 @@ export default function ChatApp() {
     navigator.clipboard.writeText(myPeerId)
     setCopiedPeerId(true)
     setTimeout(() => setCopiedPeerId(false), 2000)
-      toast.success("Copied!", {
+    toast.success("Copied!", {
       description: "Your connection code has been copied to clipboard.",
     })
   }
@@ -738,7 +769,6 @@ export default function ChatApp() {
                       <div ref={messagesEndRef} />
                     </div>
                   </ScrollArea>
-
                   <div className="flex gap-2">
                     <Input
                       placeholder="Type a message..."
@@ -759,12 +789,10 @@ export default function ChatApp() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
-
                   <Button onClick={() => fileInputRef.current?.click()} className="w-full" variant="outline">
                     <Upload className="h-4 w-4 mr-2" />
                     Share File
                   </Button>
-
                   <Button
                     onClick={startVideoCall}
                     className="w-full bg-transparent"
@@ -774,9 +802,7 @@ export default function ChatApp() {
                     <Video className="h-4 w-4 mr-2" />
                     {isInCall ? "In Call" : "Start Video Call"}
                   </Button>
-
                   <Separator />
-
                   <div className="text-sm text-gray-600">
                     <p className="font-medium mb-2">Features:</p>
                     <ul className="space-y-1 text-xs">
