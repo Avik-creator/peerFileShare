@@ -2,16 +2,8 @@
 
 import type React from "react"
 import { useState, useEffect, useRef, useCallback } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Users, Send, Upload, Copy, Check, Wifi, Video, VideoOff, Mic, MicOff, PhoneOff, ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
-import Link from "next/link"
 
 interface Message {
   id: string
@@ -92,6 +84,7 @@ export default function ChatApp() {
         console.warn("No video tracks in remote stream")
         toast.warning("No Video", {
           description: "The remote user has no video enabled.",
+          className: "bg-yellow-500 text-white",
         })
       }
 
@@ -189,6 +182,7 @@ export default function ChatApp() {
         URL.revokeObjectURL(url)
         toast.success("File Received", {
           description: `${typedData.fileName} has been downloaded automatically.`,
+          className: "bg-green-500 text-white",
         })
       }
     } else if (typedData.type === "user-info") {
@@ -222,6 +216,7 @@ export default function ChatApp() {
           })
           toast.success("Connected!", {
             description: "You are now connected and can start sharing files and chatting.",
+            className: "bg-green-500 text-white",
           })
         })
 
@@ -234,6 +229,7 @@ export default function ChatApp() {
           endCall()
           toast.error("Disconnected", {
             description: "The connection has been closed.",
+            className: "bg-red-500 text-white",
           })
         })
       })
@@ -255,6 +251,7 @@ export default function ChatApp() {
         console.error("Peer error:", err)
         toast.error("Connection Error", {
           description: "Failed to establish connection. Please try again.",
+          className: "bg-red-500 text-white",
         })
         setConnectionStatus("disconnected")
       })
@@ -284,6 +281,7 @@ export default function ChatApp() {
     if (!targetPeerId.trim()) {
       toast.error("Invalid Code", {
         description: "Please enter a valid connection code.",
+        className: "bg-red-500 text-white",
       })
       return
     }
@@ -302,6 +300,7 @@ export default function ChatApp() {
       })
       toast.success("Connected!", {
         description: "You are now connected and can start sharing files and chatting.",
+        className: "bg-green-500 text-white",
       })
     })
 
@@ -314,6 +313,7 @@ export default function ChatApp() {
       endCall()
       toast.error("Disconnected", {
         description: "The connection has been closed.",
+        className: "bg-red-500 text-white",
       })
     })
 
@@ -322,6 +322,7 @@ export default function ChatApp() {
       setConnectionStatus("disconnected")
       toast.error("Connection Failed", {
         description: "Could not connect to the specified code. Please check and try again.",
+        className: "bg-red-500 text-white",
       })
     })
   }
@@ -373,6 +374,7 @@ export default function ChatApp() {
       setMessages((prev) => [...prev, message])
       toast.success("File Sent", {
         description: `${file.name} has been sent successfully.`,
+        className: "bg-green-500 text-white",
       })
     }
     reader.readAsArrayBuffer(file)
@@ -434,6 +436,7 @@ export default function ChatApp() {
       console.error("Error starting video call:", error)
       toast.error("Call Failed", {
         description: "Could not access camera/microphone. Please check permissions.",
+        className: "bg-red-500 text-white",
       })
     }
   }
@@ -536,214 +539,205 @@ export default function ChatApp() {
 
   if (!isNameSet) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="flex items-center justify-between mb-4">
-              <Link href="/">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back
-                </Button>
-              </Link>
-            </div>
-            <CardTitle className="flex items-center justify-center gap-2">
-              <Users className="h-6 w-6" />
-              PeerShare
-            </CardTitle>
-            <CardDescription>Enter your name to start sharing files and chatting</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Input
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-8">
+          <div className="text-center space-y-4">
+            <h1 className="text-2xl font-light text-gray-900">PeerShare</h1>
+            <p className="text-gray-600 text-sm">Enter your name to start sharing files and chatting</p>
+          </div>
+          
+          <div className="space-y-4">
+            <input
               placeholder="Enter your name"
               value={userName}
               onChange={(e) => setUserName(e.target.value)}
               onKeyPress={(e) => e.key === "Enter" && userName.trim() && setIsNameSet(true)}
+              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 text-gray-900 placeholder-gray-500"
             />
-            <Button onClick={() => setIsNameSet(true)} className="w-full" disabled={!userName.trim()}>
+            <button 
+              onClick={() => setIsNameSet(true)} 
+              disabled={!userName.trim()}
+              className="w-full px-4 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
               Continue
-            </Button>
-          </CardContent>
-        </Card>
+            </button>
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">PeerShare</h1>
-            <p className="text-gray-600">Welcome, {userName}!</p>
-          </div>
-          <Link href="/">
-            <Button variant="outline">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Home
-            </Button>
-          </Link>
+    <div className="min-h-screen bg-white p-4">
+      <div className="max-w-4xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-2xl font-light text-gray-900 mb-2">PeerShare</h1>
+          <p className="text-gray-600 text-sm">Welcome, {userName}</p>
         </div>
 
         {/* Incoming Call Modal */}
         {isIncomingCall && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <Card className="w-96">
-              <CardHeader className="text-center">
-                <CardTitle>Incoming Video Call</CardTitle>
-                <CardDescription>{incomingCallFrom} is calling you</CardDescription>
-              </CardHeader>
-              <CardContent className="flex gap-4 justify-center">
-                <Button onClick={answerCall} className="bg-green-600 hover:bg-green-700">
-                  <Video className="h-4 w-4 mr-2" />
-                  Answer
-                </Button>
-                <Button onClick={rejectCall} variant="destructive">
-                  <PhoneOff className="h-4 w-4 mr-2" />
-                  Decline
-                </Button>
-              </CardContent>
-            </Card>
+            <div className="bg-white p-8 rounded-lg max-w-sm w-full mx-4">
+              <div className="text-center space-y-4">
+                <h2 className="text-xl font-light text-gray-900">Incoming Video Call</h2>
+                <p className="text-gray-600 text-sm">{remoteUserName} is calling you</p>
+                <div className="flex gap-3 justify-center">
+                  <button 
+                    onClick={answerCall} 
+                    className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+                  >
+                    Answer
+                  </button>
+                  <button 
+                    onClick={rejectCall} 
+                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Decline
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
         {!isConnected ? (
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Your Connection Code</CardTitle>
-                <CardDescription>Share this code with others to receive connection requests</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {myPeerId ? (
-                  <div className="flex items-center gap-2">
-                    <Input value={myPeerId} readOnly className="font-mono" />
-                    <Button variant="outline" size="icon" onClick={copyPeerId}>
-                      {copiedPeerId ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="text-center py-4">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="mt-2 text-sm text-gray-600">Generating your code...</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <h2 className="text-lg font-light text-gray-900">Your Connection Code</h2>
+              <p className="text-gray-600 text-sm">Share this code with others to receive connection requests</p>
+              {myPeerId ? (
+                <div className="flex items-center gap-3">
+                  <input 
+                    value={myPeerId} 
+                    readOnly 
+                    className="flex-1 px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-900 font-mono text-sm"
+                  />
+                  <button 
+                    onClick={copyPeerId}
+                    className="px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    {copiedPeerId ? "Copied" : "Copy"}
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 mx-auto"></div>
+                  <p className="mt-2 text-sm text-gray-600">Generating your code...</p>
+                </div>
+              )}
+            </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Connect to Someone</CardTitle>
-                <CardDescription>Enter their connection code to start sharing</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Input
+            <div className="space-y-4">
+              <h2 className="text-lg font-light text-gray-900">Connect to Someone</h2>
+              <p className="text-gray-600 text-sm">Enter their connection code to start sharing</p>
+              <div className="space-y-3">
+                <input
                   placeholder="Enter connection code"
                   value={targetPeerId}
                   onChange={(e) => setTargetPeerId(e.target.value)}
                   onKeyPress={(e) => e.key === "Enter" && connectToPeer()}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 text-gray-900 placeholder-gray-500"
                 />
-                <Button
+                <button
                   onClick={connectToPeer}
-                  className="w-full"
                   disabled={connectionStatus === "connecting" || !targetPeerId.trim()}
+                  className="w-full px-4 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {connectionStatus === "connecting" ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Connecting...
-                    </>
-                  ) : (
-                    "Connect"
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
+                  {connectionStatus === "connecting" ? "Connecting..." : "Connect"}
+                </button>
+              </div>
+            </div>
           </div>
         ) : (
-          <div className="space-y-6">
-            <Alert>
-              <Wifi className="h-4 w-4" />
-              <AlertDescription>
+          <div className="space-y-8">
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-700">
                 Connected with {remoteUserName || "Unknown User"}
-                <Badge variant="secondary" className="ml-2">
-                  <Wifi className="h-3 w-3 mr-1" />
-                  Online
-                </Badge>
-              </AlertDescription>
-            </Alert>
+                <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded">Online</span>
+              </p>
+            </div>
 
             {/* Video Call Section */}
             {isInCall && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Video Call</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid md:grid-cols-2 gap-4 mb-4">
-                    <div className="relative">
-                      <video
-                        ref={remoteVideoRef}
-                        autoPlay
-                        playsInline
-                        className="w-full h-64 bg-gray-900 rounded-lg object-cover"
-                      />
-                      {!hasRemoteStream && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 rounded-lg">
-                          <div className="text-white text-center">
-                            <Video className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                            <p className="text-sm">Waiting for remote video...</p>
-                          </div>
+              <div className="space-y-4">
+                <h2 className="text-lg font-light text-gray-900">Video Call</h2>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="relative">
+                    <video
+                      ref={remoteVideoRef}
+                      autoPlay
+                      playsInline
+                      className="w-full h-64 bg-gray-900 rounded-lg object-cover"
+                    />
+                    {!hasRemoteStream && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-gray-900 rounded-lg">
+                        <div className="text-white text-center">
+                          <p className="text-sm">Waiting for remote video...</p>
                         </div>
-                      )}
-                      <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
-                        {remoteUserName || "Remote User"}
                       </div>
-                    </div>
-                    <div className="relative">
-                      <video
-                        ref={localVideoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        className="w-full h-64 bg-gray-900 rounded-lg object-cover"
-                      />
-                      {!hasLocalStream && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 rounded-lg">
-                          <div className="text-white text-center">
-                            <Video className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                            <p className="text-sm">Your camera</p>
-                          </div>
-                        </div>
-                      )}
-                      <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
-                        You
-                      </div>
+                    )}
+                    <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
+                      {remoteUserName || "Remote User"}
                     </div>
                   </div>
-                  <div className="flex justify-center gap-4">
-                    <Button variant={isAudioEnabled ? "default" : "destructive"} size="icon" onClick={toggleAudio}>
-                      {isAudioEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
-                    </Button>
-                    <Button variant={isVideoEnabled ? "default" : "destructive"} size="icon" onClick={toggleVideo}>
-                      {isVideoEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
-                    </Button>
-                    <Button variant="destructive" size="icon" onClick={endCall}>
-                      <PhoneOff className="h-4 w-4" />
-                    </Button>
+                  <div className="relative">
+                    <video
+                      ref={localVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full h-64 bg-gray-900 rounded-lg object-cover"
+                    />
+                    {!hasLocalStream && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-gray-900 rounded-lg">
+                        <div className="text-white text-center">
+                          <p className="text-sm">Your camera</p>
+                        </div>
+                      </div>
+                    )}
+                    <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
+                      You
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+                <div className="flex justify-center gap-3">
+                  <button 
+                    onClick={toggleAudio}
+                    className={`p-3 rounded-lg border transition-colors ${
+                      isAudioEnabled 
+                        ? "border-gray-300 hover:bg-gray-50" 
+                        : "border-red-300 bg-red-50 text-red-700"
+                    }`}
+                  >
+                    {isAudioEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+                  </button>
+                  <button 
+                    onClick={toggleVideo}
+                    className={`p-3 rounded-lg border transition-colors ${
+                      isVideoEnabled 
+                        ? "border-gray-300 hover:bg-gray-50" 
+                        : "border-red-300 bg-red-50 text-red-700"
+                    }`}
+                  >
+                    {isVideoEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
+                  </button>
+                  <button 
+                    onClick={endCall}
+                    className="p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                  >
+                    <PhoneOff className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
             )}
 
-            <div className="grid lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle>Chat</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <ScrollArea className="h-96 w-full border rounded-md p-4">
-                    <div className="space-y-4">
+            <div className="grid lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 space-y-4">
+                <h2 className="text-lg font-light text-gray-900">Chat</h2>
+                <div className="border border-gray-200 rounded-lg h-96 overflow-hidden">
+                  <div className="h-full flex flex-col">
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
                       {messages.map((message) => (
                         <div
                           key={message.id}
@@ -751,7 +745,9 @@ export default function ChatApp() {
                         >
                           <div
                             className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                              message.sender === userName ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-900"
+                              message.sender === userName 
+                                ? "bg-gray-900 text-white" 
+                                : "bg-gray-100 text-gray-900"
                             }`}
                           >
                             <div className="text-xs opacity-75 mb-1">
@@ -768,52 +764,58 @@ export default function ChatApp() {
                       ))}
                       <div ref={messagesEndRef} />
                     </div>
-                  </ScrollArea>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Type a message..."
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={(e) => e.key === "Enter" && sendMessage()}
-                    />
-                    <Button onClick={sendMessage} size="icon">
-                      <Send className="h-4 w-4" />
-                    </Button>
+                    <div className="border-t border-gray-200 p-4">
+                      <div className="flex gap-3">
+                        <input
+                          placeholder="Type a message..."
+                          value={newMessage}
+                          onChange={(e) => setNewMessage(e.target.value)}
+                          onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+                          className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 text-gray-900 placeholder-gray-500"
+                        />
+                        <button 
+                          onClick={sendMessage}
+                          className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+                        >
+                          Send
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
+              <div className="space-y-4">
+                <h2 className="text-lg font-light text-gray-900">Actions</h2>
+                <div className="space-y-3">
                   <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
-                  <Button onClick={() => fileInputRef.current?.click()} className="w-full" variant="outline">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Share File
-                  </Button>
-                  <Button
-                    onClick={startVideoCall}
-                    className="w-full bg-transparent"
-                    variant="outline"
-                    disabled={isInCall}
+                  
+                  <button 
+                    onClick={() => fileInputRef.current?.click()} 
+                    className="w-full px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-700"
                   >
-                    <Video className="h-4 w-4 mr-2" />
+                    Share File
+                  </button>
+
+                  <button
+                    onClick={startVideoCall}
+                    disabled={isInCall}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-gray-700"
+                  >
                     {isInCall ? "In Call" : "Start Video Call"}
-                  </Button>
-                  <Separator />
-                  <div className="text-sm text-gray-600">
-                    <p className="font-medium mb-2">Features:</p>
-                    <ul className="space-y-1 text-xs">
-                      <li>• Instant file sharing</li>
-                      <li>• HD video calling</li>
-                      <li>• Real-time chat</li>
-                      <li>• End-to-end encrypted</li>
-                    </ul>
-                  </div>
-                </CardContent>
-              </Card>
+                  </button>
+                </div>
+
+                <div className="pt-4 border-t border-gray-200">
+                  <p className="text-sm text-gray-600 mb-2">Features:</p>
+                  <ul className="space-y-1 text-xs text-gray-500">
+                    <li>• Instant file sharing</li>
+                    <li>• HD video calling</li>
+                    <li>• Real-time chat</li>
+                    <li>• End-to-end encrypted</li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
         )}
