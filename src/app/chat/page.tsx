@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useRef, useCallback } from "react"
-import { Users, Send, Upload, Copy, Check, Wifi, Video, VideoOff, Mic, MicOff, PhoneOff, ArrowLeft } from "lucide-react"
+import { Video, VideoOff, Mic, MicOff, PhoneOff } from "lucide-react"
 import { toast } from "sonner"
 
 interface Message {
